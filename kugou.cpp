@@ -17,6 +17,7 @@ static char * _url;
 static pthread_t a_thread;
 
 static void *thread_function(void *arg){
+    *((int*)arg) = -1;
     int res;
     res = pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
     if(res != 0){
@@ -30,9 +31,11 @@ static void *thread_function(void *arg){
         exit(EXIT_FAILURE);
     }
     LOGI("thread_function is running\n");
-    getDataFromUrl(_url);
+    res = getDataFromUrl(_url);
+    if(res == 0){
+        *((int*)arg) = 0;
+    }
     LOGI("thread_function is stop\n");
-
     pthread_exit(0);
 }
 
@@ -48,10 +51,11 @@ void RK_ota_set_url(char *url){
 void RK_ota_start(RK_upgrade_callback cb){
     LOGI("start RK_ota_start.\n");
     int res;
+    int update_result = 0;
     void *thread_result;
 
     cb(NULL, RK_UPGRADE_START);
-    res = pthread_create(&a_thread, NULL, thread_function, NULL);
+    res = pthread_create(&a_thread, NULL, thread_function, &update_result);
     if(res != 0){
         LOGE("Thread creation failed.");
         cb(NULL, RK_UPGRADE_ERR);
@@ -59,6 +63,11 @@ void RK_ota_start(RK_upgrade_callback cb){
     }
     LOGI("waiting for thread to finish...\n");
     res = pthread_join(a_thread, &thread_result);
+    if(update_result != 0){
+        LOGE("update_result return failed.\n");
+        cb(NULL, RK_UPGRADE_ERR);
+        return ;
+    }
     if(res != 0){
         LOGE("Thread join failed.\n");
         cb(NULL, RK_UPGRADE_ERR);

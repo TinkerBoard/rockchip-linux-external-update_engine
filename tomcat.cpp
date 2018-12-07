@@ -25,10 +25,13 @@ size_t writeToString(void *ptr, size_t size, size_t count, void *stream)
     //LOGI("pData->offset = %u\n", currentOffset);
     //LOGI("pData->size = %u\n", pData->size);
     memcpy(pData->data, ptr, count * size);
-    writeDataToPartition(pData);
+    int res = writeDataToPartition(pData);
     currentOffset += size * count;
     free(pData->data);
     pthread_testcancel();
+    if(res != 0){
+        return -1;
+    }
     return size * count;
 }
 
@@ -47,17 +50,15 @@ int getProgressValue(void* clientp, double dltotal, double dlnow, double ulttota
 
 int getDataFromUrl(char *url)
 {
-
-
     CURL *curl;
     CURLcode res;
 
     curl = curl_easy_init();
     if(curl) {
         //std::string data;
-
         curl_easy_setopt(curl, CURLOPT_URL, url);
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeToString);
+        //curl_easy_setopt(curl, CURLOPT_WRITEDATA, &return_val);
 
         curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
         //curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, getProgressValue);
@@ -72,8 +73,7 @@ int getDataFromUrl(char *url)
         res = curl_easy_perform(curl);
         /* Check for errors */
         if(res != CURLE_OK)
-            fprintf(stderr, "curl_easy_perform() failed: %s\n",
-                    curl_easy_strerror(res));
+            LOGE("curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
         //std::cout << data << std::endl;
         //std::cout << data.length() << std::endl;
         /*
@@ -86,6 +86,12 @@ int getDataFromUrl(char *url)
 
         /* always cleanup */
         curl_easy_cleanup(curl);
+    }
+    if(res != CURLE_OK){
+        LOGE("update Error.\n");
+        return -1;
+    }else{
+        LOGE("update ok.\n");
         setSlotToActive();
     }
     return 0;

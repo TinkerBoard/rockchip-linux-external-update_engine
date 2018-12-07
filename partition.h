@@ -7,6 +7,6 @@
 
 #ifndef _PARTITION_H
 #define _PARTITION_H
-void writeDataToPartition(struct ImageData *data);
+int writeDataToPartition(struct ImageData *data);
 int getNowSlot();
 #endif
