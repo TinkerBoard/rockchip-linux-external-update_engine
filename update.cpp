@@ -1,5 +1,5 @@
 #include <iostream>
-#include "kugou.h"
+#include "update.h"
 #include "deviceInfo.h"
 #include "log.h"
 #include <string>
@@ -13,9 +13,9 @@
 
 #include "tomcat.h"
 
-static char * _url;
+static char * _url = NULL;
+/*
 static pthread_t a_thread;
-
 static void *thread_function(void *arg){
     *((int*)arg) = -1;
     int res;
@@ -37,7 +37,7 @@ static void *thread_function(void *arg){
     }
     LOGI("thread_function is stop\n");
     pthread_exit(0);
-}
+}*/
 
 void RK_ota_set_url(char *url){
     if(url == NULL){
@@ -50,18 +50,29 @@ void RK_ota_set_url(char *url){
 
 void RK_ota_start(RK_upgrade_callback cb){
     LOGI("start RK_ota_start.\n");
+    cb(NULL, RK_UPGRADE_START);
+    if(_url != NULL){
+
+    }
+    if(getDataFromUrl(_url) != 0){
+        LOGE("getDataFromUrl failed.\n");
+        cb(NULL, RK_UPGRADE_ERR);
+        return ;
+    }
+/*
     int res;
     int update_result = 0;
     void *thread_result;
 
-    cb(NULL, RK_UPGRADE_START);
     res = pthread_create(&a_thread, NULL, thread_function, &update_result);
     if(res != 0){
         LOGE("Thread creation failed.");
         cb(NULL, RK_UPGRADE_ERR);
         return ;
     }
+
     LOGI("waiting for thread to finish...\n");
+
     res = pthread_join(a_thread, &thread_result);
     if(update_result != 0){
         LOGE("update_result return failed.\n");
@@ -73,17 +84,20 @@ void RK_ota_start(RK_upgrade_callback cb){
         cb(NULL, RK_UPGRADE_ERR);
         exit(EXIT_FAILURE);
     }
+*/
+    LOGI("RK_ota_start is ok!");
     cb(NULL, RK_UPGRADE_FINISHED);
 }
 
 void RK_ota_stop(){
     int res;
     LOGI("start RK_ota_stop.\n");
+	/*
     res = pthread_cancel(a_thread);
     if(res != 0){
         LOGE("Thread cancelation failed");
         exit(EXIT_FAILURE);
-    }
+    }*/
 }
 
 

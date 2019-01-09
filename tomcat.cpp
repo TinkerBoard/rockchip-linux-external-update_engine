@@ -9,7 +9,8 @@
 #include <string.h>
 #include <unistd.h>
 #include "tomcat.h"
-#include "bootcontrol.h"
+//#include "bootcontrol.h"
+#include "rkboot_control.h"
 
 size_t writeToString(void *ptr, size_t size, size_t count, void *stream)
 {
@@ -28,7 +29,7 @@ size_t writeToString(void *ptr, size_t size, size_t count, void *stream)
     int res = writeDataToPartition(pData);
     currentOffset += size * count;
     free(pData->data);
-    pthread_testcancel();
+    //pthread_testcancel();
     if(res != 0){
         return -1;
     }
@@ -92,7 +93,7 @@ int getDataFromUrl(char *url)
         return -1;
     }else{
         LOGE("update ok.\n");
-        setSlotToActive();
+        setSlotActivity();
     }
     return 0;
 }
