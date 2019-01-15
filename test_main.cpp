@@ -1,5 +1,7 @@
 #include <iostream>
 #include "update.h"
+#include <unistd.h>
+#include <sys/reboot.h>
 void handle_upgrade_callback(void *user_data, RK_Upgrade_Status_t status){
 
 }
