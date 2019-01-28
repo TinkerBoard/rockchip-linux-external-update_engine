@@ -18,16 +18,14 @@
 #define MISC_PARTITION_NMAE "/dev/block/by-name/misc"
 
 #define CMDLINE_LENGTH 2048
-struct ab_slot_data {
-    unsigned char retry; //5
-    unsigned char priority; //0, 1, 2
-    unsigned char reserved[2];
-};
 
 struct rk_ab {
     unsigned char magic[AB_MAGIC_LEN];
     unsigned int version;
-    struct ab_slot_data slots[AB_SLOT_NUM];
+    int last_boot;
+    int use_a;
+    int use_b;
+    int current_boot;
     unsigned char reserved[12];
     unsigned int crc32;
 };

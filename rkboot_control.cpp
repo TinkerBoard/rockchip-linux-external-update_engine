@@ -110,10 +110,10 @@ int getCurrentSlot(){
 void display(struct rk_ab info){
     printf("magic = %s\n", info.magic);
     printf("version = %d\n", info.version);
-    printf("slot[0].retry = %d\n", info.slots[0].retry);
-    printf("slot[0].priority = %d\n", info.slots[0].priority);
-    printf("slot[1].retry = %d\n", info.slots[1].retry);
-    printf("slot[1].priority = %d\n", info.slots[1].priority);
+    printf("last_boot = %d\n", info.last_boot);
+    printf("use_a = %d\n", info.use_a);
+    printf("use_b = %d\n", info.use_b);
+    printf("current_boot = %d\n", info.current_boot);
     printf("crc32 = %d\n", info.crc32);
 }
 
@@ -190,14 +190,13 @@ int setSlotSucceed(){
         return -1;
     }
     struct rk_ab info;
-    memcpy(info.magic, AB_MAGIC, AB_MAGIC_LEN);
-    info.version = AB_VERSION;
-    info.slots[now_slot].retry = RETRY_MAX;
-    info.slots[now_slot].priority = 2;
-
-    info.slots[1 - now_slot].retry = RETRY_MAX;
-    info.slots[1 - now_slot].priority = 1;
     rk_ab_update_crc(&info);
+    if(readMisc(&info) == -1){
+        return -1;
+    }
+    info.last_boot = now_slot;
+    info.use_a = -1;
+    info.use_b = -1;
 
     if(writeMisc(info) != 0){
         return -1;
@@ -214,13 +213,19 @@ int setSlotActivity(){
         return -1;
     }
     struct rk_ab info;
-    memcpy(info.magic, AB_MAGIC, AB_MAGIC_LEN);
     info.version = AB_VERSION;
-    info.slots[now_slot].retry = RETRY_MAX;
-    info.slots[now_slot].priority = 1;
 
-    info.slots[1 - now_slot].retry = RETRY_MAX;
-    info.slots[1 - now_slot].priority = 2;
+    if(readMisc(&info) == -1){
+        return -1;
+    }
+    if(now_slot == 0){
+        info.use_a = -1;
+        info.use_b = 0;
+    }else if(now_slot == 1){
+        info.use_a = 0;
+        info.use_b = -1;
+    }
+
     rk_ab_update_crc(&info);
 
     if(writeMisc(info) != 0){
