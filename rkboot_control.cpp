@@ -6,6 +6,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <unistd.h>
+#include <sys/reboot.h>
 #include "rkboot_control.h"
 
 static unsigned int iavb_crc32_tab[] = {
@@ -234,3 +236,77 @@ int setSlotActivity(){
     return 0;
 }
 
+
+/**
+ * 从misc 偏移4k处读取命令
+ */
+static int readMiscCmd(char *cmdline, int length){
+    memset(cmdline, 0, strlen(cmdline));
+    int fd = open(MISC_PARTITION_NMAE, O_RDONLY);
+    if(fd < 0){
+        printf("open %s failed. %s\n", MISC_PARTITION_NMAE, strerror(errno));
+        return -1;
+    }
+    if(lseek(fd, MISC_OFFSET_CMDLINE, SEEK_SET) == -1){
+        printf("lseek %s error. %s\n", MISC_PARTITION_NMAE, strerror(errno));
+        close(fd);
+        return -1;
+    }
+
+    if(read(fd, cmdline, length) != length){
+        printf("read failed, %s\n", strerror(errno));
+        close(fd);
+        return -1;
+    }
+    close(fd);
+    return 0;
+}
+
+/**
+ * 往misc 偏移4k处写入命令
+ */
+static int writeMiscCmd(char *cmdline){
+    int fd = open(MISC_PARTITION_NMAE, O_WRONLY);
+    if(fd < 0){
+        printf("open %s failed.\n", MISC_PARTITION_NMAE);
+        return -1;
+    }
+
+    if(lseek(fd, MISC_OFFSET_CMDLINE, SEEK_SET) == -1){
+        printf("lseek %s error. %s\n", MISC_PARTITION_NMAE, strerror(errno));
+        close(fd);
+        return -1;
+    }
+
+    if(write(fd, cmdline, strlen(cmdline)) != strlen(cmdline)){
+        printf("write failed, %s\n", strerror(errno));
+        close(fd);
+        return -1;
+    }
+    sync();
+    close(fd);
+
+    char tmp[256];
+    if(readMiscCmd(tmp, strlen(cmdline)) == -1){
+        return -1;
+    }
+    if(memcmp(tmp, cmdline, strlen(cmdline)) != 0){
+        printf("write error: memcmp \n");
+        return -1;
+    }
+
+    return 0;
+}
+
+bool wipe_userdata(bool auto_reboot){
+    if(writeMiscCmd(CMD_WIPE_USERDATA) != 0){
+        return false;
+    }
+
+    if(auto_reboot) {
+        printf("auto reboot, %s.\n", CMD_WIPE_USERDATA);
+        sleep(1);
+        reboot(RB_AUTOBOOT);
+    }
+    return true;
+}

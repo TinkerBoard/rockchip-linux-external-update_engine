@@ -15,9 +15,12 @@
 #define AB_VERSION   0
 
 #define MISC_OFFSET 2048
+#define MISC_OFFSET_CMDLINE 4096
 #define MISC_PARTITION_NMAE "/dev/block/by-name/misc"
 
 #define CMDLINE_LENGTH 2048
+
+#define CMD_WIPE_USERDATA "cmd_wipe_userdata"
 
 struct rk_ab {
     unsigned char magic[AB_MAGIC_LEN];
@@ -34,4 +37,6 @@ int setSlotActivity();
 int setSlotSucceed();
 int readMisc(struct rk_ab* info);
 void display(struct rk_ab info);
+
+bool wipe_userdata(bool auto_reboot);
 #endif
