@@ -32,7 +32,7 @@ $(LIB_NAME): $(OBJ_UPDATE) $(OBJ_RKBOOTCONTROL)
 	$(CXX) -shared -o $(LIB_NAME) $(OBJ_UPDATE) $(OBJ_RKBOOTCONTROL)
 
 %.o: %.cpp 
-	$(CXX) -c -fPIC $< -o $@
+	$(CXX) -c $(CFLAGS) -fPIC $< -o $@
 
 clean:
 	rm -rf $(OBJ) $(PROM)

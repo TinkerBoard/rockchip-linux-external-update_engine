@@ -7,16 +7,20 @@ int main(int argc, char *argv[]){
     //3. wipe_userdata reboot/ wipe_userdata
     if(argc == 1){
         printf("Error: bootcontrol parameter error.\n");
-        struct rk_ab info;
+        printf("rkboot_control now.\n");
+        printf("rkboot_control other.\n");
+        printf("rkboot_control wipe_userdata.\n");
+        printf("rkboot_control wipe_userdata reboot.\n");
+        struct AvbABData info;
         readMisc(&info);
         display(info);
         return -1;
     }
 
-    if(strcmp(argv[1], "bootsucceed") == 0){
+    if(strcmp(argv[1], "now") == 0){
         printf("set now slot to succeed.\n");
         return setSlotSucceed();
-    }else if(strcmp(argv[1], "bootactivity") == 0){
+    }else if(strcmp(argv[1], "other") == 0){
         printf("set other slot to activity.\n");
         return setSlotActivity();
     }else if(strcmp(argv[1], "wipe_userdata") == 0){

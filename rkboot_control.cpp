@@ -56,6 +56,19 @@ static unsigned int iavb_crc32_tab[] = {
     0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d
 };
 
+/* Converts a 32-bit unsigned integer from host to big-endian byte order. */
+unsigned int avb_htobe32(unsigned int in) {
+    union {
+        unsigned int word;
+        unsigned char bytes[4];
+    } ret;
+    ret.bytes[0] = (in >> 24) & 0xff;
+    ret.bytes[1] = (in >> 16) & 0xff;
+    ret.bytes[2] = (in >> 8) & 0xff;
+    ret.bytes[3] = in & 0xff;
+    return ret.word;
+}
+
 /*
  *  A function that calculates the CRC-32 based on the table above is
  *  given below for documentation purposes. An equivalent implementation
@@ -76,9 +89,9 @@ unsigned int avb_crc32(const unsigned char* buf, size_t size) {
       return iavb_crc32(0, buf, size);
 }
 
-void rk_ab_update_crc(struct rk_ab *data)
+void AvbABData_update_crc(struct AvbABData *data)
 {
-    data->crc32 = avb_crc32((const unsigned char*)data, sizeof(struct rk_ab) - sizeof(unsigned int));
+    data->crc32 = avb_htobe32(avb_crc32((const unsigned char*)data, sizeof(struct AvbABData) - sizeof(unsigned int)));
 }
 
 /**
@@ -109,7 +122,8 @@ int getCurrentSlot(){
 }
 
 
-void display(struct rk_ab info){
+void display(struct AvbABData info){
+    /*
     printf("magic = %s\n", info.magic);
     printf("version = %d\n", info.version);
     printf("last_boot = %d\n", info.last_boot);
@@ -117,13 +131,26 @@ void display(struct rk_ab info){
     printf("use_b = %d\n", info.use_b);
     printf("current_boot = %d\n", info.current_boot);
     printf("crc32 = %d\n", info.crc32);
+    */
+    printf("magic = %s\n", info.magic);
+    printf("version_major = %d.\n", info.version_major);
+    printf("version_min = %d.\n", info.version_minor);
+    for(int i = 0; i < 2; i++){
+        printf("info.slot[%d]->priority = %d.\n", i, info.slots[i].priority);
+        printf("info.slot[%d]->tries_remaining = %d.\n", i, info.slots[i].tries_remaining);
+        printf("info.slot[%d]->successful_boot = %d.\n", i, info.slots[i].successful_boot);
+    } 
+    printf("last_boot = %d.\n", info.last_boot);
+    printf("my crc32 = %x.\n", avb_crc32((const unsigned char*)&info, sizeof(struct AvbABData) - sizeof(unsigned int)));
+    printf("crc32 = %x\n", info.crc32);
+    printf("sizeof(struct AvbABData) = %ld\n", sizeof(struct AvbABData));
 }
 
 /**
  * 从misc 偏移2k处读取引导信息
  */
-int readMisc(struct rk_ab* info){
-    memset(info, 0, sizeof(struct rk_ab));
+int readMisc(struct AvbABData* info){
+    memset(info, 0, sizeof(struct AvbABData));
 
     int fd = open(MISC_PARTITION_NMAE, O_RDONLY);
     if(fd < 0){
@@ -137,7 +164,7 @@ int readMisc(struct rk_ab* info){
         return -1;
     }
 
-    if(read(fd, info, sizeof(struct rk_ab)) != sizeof(struct rk_ab)){
+    if(read(fd, info, sizeof(struct AvbABData)) != sizeof(struct AvbABData)){
         printf("read failed, %s\n", strerror(errno));
         close(fd);
         return -1;
@@ -150,7 +177,7 @@ int readMisc(struct rk_ab* info){
 /**
  * 往misc 偏移2k处写入引导信息
  */
-int writeMisc(struct rk_ab info){
+int writeMisc(struct AvbABData info){
     int fd = open(MISC_PARTITION_NMAE, O_WRONLY);
     if(fd < 0){
         printf("open %s failed.\n", MISC_PARTITION_NMAE);
@@ -163,7 +190,7 @@ int writeMisc(struct rk_ab info){
         return -1;
     }
 
-    if(write(fd, &info, sizeof(struct rk_ab)) != sizeof(struct rk_ab)){
+    if(write(fd, &info, sizeof(struct AvbABData)) != sizeof(struct AvbABData)){
         printf("write failed, %s\n", strerror(errno));
         close(fd);
         return -1;
@@ -171,11 +198,11 @@ int writeMisc(struct rk_ab info){
     sync();
     close(fd);
 
-    struct rk_ab data_check;
+    struct AvbABData data_check;
     if(readMisc(&data_check) == -1){
         return -1;
     }
-    if(memcmp(&data_check, &info, sizeof(struct rk_ab)) != 0){
+    if(memcmp(&data_check, &info, sizeof(struct AvbABData)) != 0){
         printf("write error: memcmp \n");
         return -1;
     }
@@ -184,21 +211,28 @@ int writeMisc(struct rk_ab info){
 }
 
 /**
- * 设置当前分区为优先级最高
+ * 设置当前分区为可启动分区
  */
 int setSlotSucceed(){
     int now_slot = getCurrentSlot();
     if(now_slot == -1){
         return -1;
     }
-    struct rk_ab info;
-    rk_ab_update_crc(&info);
+    struct AvbABData info;
     if(readMisc(&info) == -1){
         return -1;
     }
+    
+#ifdef SUCCESSFUL_BOOT
+    info.slots[now_slot].tries_remaining = 0;
+    info.slots[now_slot].successful_boot = 1;
+#endif
+#ifdef RETRY_BOOT
+    info.slots[now_slot].tries_remaining = AVB_AB_MAX_TRIES_REMAINING;
+#endif
     info.last_boot = now_slot;
-    info.use_a = -1;
-    info.use_b = -1;
+
+    AvbABData_update_crc(&info);
 
     if(writeMisc(info) != 0){
         return -1;
@@ -214,21 +248,20 @@ int setSlotActivity(){
     if(now_slot == -1){
         return -1;
     }
-    struct rk_ab info;
-    info.version = AB_VERSION;
+    struct AvbABData info;
 
     if(readMisc(&info) == -1){
         return -1;
     }
-    if(now_slot == 0){
-        info.use_a = -1;
-        info.use_b = 0;
-    }else if(now_slot == 1){
-        info.use_a = 0;
-        info.use_b = -1;
-    }
 
-    rk_ab_update_crc(&info);
+    info.slots[now_slot].priority = AVB_AB_MAX_PRIORITY - 1;
+    info.slots[1 - now_slot].priority = AVB_AB_MAX_PRIORITY;
+    info.slots[1 - now_slot].tries_remaining = AVB_AB_MAX_TRIES_REMAINING;
+#ifdef SUCCESSFUL_BOOT
+    info.slots[1 - now_slot].successful_boot = 0;
+#endif
+
+    AvbABData_update_crc(&info);
 
     if(writeMisc(info) != 0){
         return -1;
