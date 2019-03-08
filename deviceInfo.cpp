@@ -8,7 +8,7 @@
 
 
 void DeviceInfo::setHost(std::string _host){
-    this->host = _host;
+    host = _host;
 }
 
 void DeviceInfo::setCurrentConfig(){
@@ -31,7 +31,7 @@ void DeviceInfo::setCurrentConfig(){
         }else if(strItemName.compare("RK_VERSION") == 0){
             currentVersion = strItemValue;
         }else if(strItemName.compare("RK_OTA_HOST") == 0){
-            setHost(strItemValue);
+            //setHost(strItemValue);
         }
     }
     f.close();
@@ -71,7 +71,6 @@ bool DeviceInfo::compareVersion(){
     std::cout << targetVersion << std::endl;
     std::cout << currentVersion << std::endl;
     int retval =  currentVersion.compare(targetVersion);
-    std::cout << retval << std::endl;
     if(retval < 0)
         return true;
     else
@@ -110,7 +109,7 @@ void DeviceInfoInternel::setTargetConfig(){
 
     curl = curl_easy_init();
     if(curl) {
-        std::string url = host + "/version";
+        std::string url = host;
         std::cout << "url is " << url << std::endl;
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeConfigToString);

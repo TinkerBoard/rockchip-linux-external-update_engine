@@ -17,6 +17,7 @@
 #define MAX_MANUFACTURER 60
 #define MAX_PACKAGE_FILES 16
 #define RKIMAGE_TAG 0x46414B52
+#define  IMAGE_RESERVED_SIZE 61
 
 typedef struct tagRKIMAGE_ITEM
 {
@@ -42,5 +43,5 @@ typedef struct tagRKIMAGE_HDR
 
 void display_RKIMAGE_HDR(RKIMAGE_HDR* hdr);
 void adjustFileOffset(RKIMAGE_HDR* hdr, int offset);
-
+int CheckImageFile(const char* path, RKIMAGE_HDR* hdr);
 #endif

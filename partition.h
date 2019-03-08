@@ -8,5 +8,6 @@
 #ifndef _PARTITION_H
 #define _PARTITION_H
 int writeDataToPartition(struct ImageData *data);
+bool writeImageToPartition(const char* path);
 int getNowSlot();
 #endif

@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include "log.h"
+#include <errno.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -13,8 +14,10 @@
 
 #include <map>
 #include <string>
+#include "md5sum.h"
 using namespace std;
 
+extern double processvalue;
 int getNowSlot(){
     char cmdline[1024];
     int fd = open("/proc/cmdline", O_RDONLY);
@@ -76,41 +79,6 @@ bool getPartitionType(char* name, char *dest_path){
 
     LOGI("getPartitionType is %s", it->second.c_str());
     strcpy(dest_path, it->second.c_str());
-    return true;
-}
-
-bool checkdata(char *dest_path, unsigned char *source_md5sum){
-    MD5_CTX ctx;
-    unsigned char md5sum[16];
-
-    char buffer[512];
-    int len = 0;
-
-    FILE *fp = fopen(dest_path, "rb");
-
-    if(fp == NULL){
-        LOGE("open file failed %s", dest_path);
-        return false;
-    }
-    MD5_Init(&ctx);
-    while((len = fread(buffer, 1, 512, fp)) > 0){
-        MD5_Update(&ctx, buffer, len);
-        memset(buffer, 0, sizeof(buffer));
-    }
-    MD5_Final(md5sum, &ctx);
-    fclose(fp);
-
-    for(int i = 0; i < 16; i++){
-        printf("%02x", md5sum[i]);
-    }
-    printf("\n");
-    for(int i = 0; i < 16; i++){
-        if(md5sum[i] != source_md5sum[i]){
-            LOGE("MD5Check is error of %s", dest_path);
-            return false;
-        }
-    }
-    LOGI("MD5Check is ok of %s", dest_path);
     return true;
 }
 
@@ -279,4 +247,91 @@ int writeDataToPartition(struct ImageData *data){
     //3. FIRMWARE_DATA
 
     //4. MD5 check
+}
+bool writeImageToPartition(const char* path){
+    RKIMAGE_HDR hdr;
+    char data_buf[16*1024] = {0};
+    if(CheckImageFile(path, &hdr) != 0){
+        LOGE("CheckImageFile filed.\n");
+        return false;
+    }
+    processvalue = 95;
+    for(int i = 0; i < hdr.item_count; i++){
+        //char name[PART_NAME];
+        //char file[RELATIVE_PATH];
+        //unsigned int offset;
+        //unsigned int flash_offset;
+        //unsigned int usespace;
+        //unsigned int size;
+        char dest_path[256] = {0};
+        int fd_src = 0;
+        int fd_dest = 0;
+        int src_offset, dest_offset;
+        int src_step, dest_step;
+        int src_remain, dest_remain;
+        int src_file_offset = 0;
+        dest_offset = 0;
+
+        if(getPartitionType(hdr.item[i].name, dest_path)){
+            //write
+            LOGI("write image of %s to %s.\n", hdr.item[i].name, dest_path);
+            fd_src = open(path, O_RDONLY);
+            if (fd_src < 0) {
+                LOGE("Can't open %s\n", path);
+                return false;
+            }
+            src_offset = hdr.item[i].offset;
+            dest_remain = src_remain = hdr.item[i].size;
+            dest_step = src_step = 16*1024;
+
+            lseek(fd_src, src_offset, SEEK_SET);
+            src_file_offset = src_offset;
+
+            //???
+            fd_dest = open(dest_path, O_RDWR | O_CREAT, 0644);
+            if(fd_dest < 0){
+                LOGE("Can't open %s\n", path);
+                return false;
+            }
+            lseek(fd_dest, dest_offset, SEEK_SET);
+
+            int read_count, write_count;
+            while(src_remain > 0 && dest_remain > 0){
+                memset(data_buf, 0, 16*1024);
+                read_count = src_remain>src_step?src_step:src_remain;
+
+                if(read(fd_src, data_buf, read_count) != read_count){
+                    close(fd_src);
+                    close(fd_dest);
+                    LOGE("Read failed(%s)\n", strerror(errno));
+                    return false;
+                }
+
+                src_remain -= read_count;
+                src_file_offset += read_count;
+
+                write_count = (src_remain == 0)?dest_remain:dest_step;
+
+                if(write(fd_dest, data_buf, dest_step) != dest_step){
+                    close(fd_src);
+                    close(fd_dest);
+                    LOGE("Write failed(%s)\n", strerror(errno));
+                    return false;
+                }
+                dest_remain -= write_count;
+            }
+            fsync(fd_dest);
+            close(fd_src);
+            close(fd_dest);
+            //check
+            LOGI("check image of %s to %s.\n", hdr.item[i].name, dest_path);
+            if(!comparefile(dest_path, path, 0, src_offset, hdr.item[i].size)){
+                LOGE("check image of %s to %s. failed.\n", hdr.item[i].name, dest_path);
+                return false;
+            }
+        }
+    }
+    processvalue = 100;
+    return true;
+
 }

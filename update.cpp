@@ -11,8 +11,13 @@
 #include <stdlib.h>
 #include <errno.h>
 
+#include "download.h"
 #include "tomcat.h"
+#include "rkimage.h"
+#include "partition.h"
+#include "rkboot_control.h"
 
+double processvalue = 0;
 static char * _url = NULL;
 /*
 static pthread_t a_thread;
@@ -51,14 +56,34 @@ void RK_ota_set_url(char *url){
 void RK_ota_start(RK_upgrade_callback cb){
     LOGI("start RK_ota_start.\n");
     cb(NULL, RK_UPGRADE_START);
-    if(_url != NULL){
-
+    if(_url == NULL){
+        LOGE("url is NULL\n");
+        cb(NULL, RK_UPGRADE_ERR);
+        return ;
     }
+#if 0
     if(getDataFromUrl(_url) != 0){
         LOGE("getDataFromUrl failed.\n");
         cb(NULL, RK_UPGRADE_ERR);
         return ;
     }
+#endif
+
+    download_file(_url, "/tmp/update.img");
+    if(!writeImageToPartition("/tmp/update.img")){
+        LOGE("writeImageToPartition failed.\n");
+        cb(NULL, RK_UPGRADE_ERR);
+        return ;
+    }
+    if(setSlotActivity() != 0){
+        LOGE("setSlotActivity error.\n");
+        cb(NULL, RK_UPGRADE_ERR);
+        return ;
+    }
+    //CheckImageFile_2(_url);
+    //RKIMAGE_HDR hdr;
+    //CheckImageFile(_url, &hdr);
+
 /*
     int res;
     int update_result = 0;
@@ -102,7 +127,10 @@ void RK_ota_stop(){
 
 
 int RK_ota_get_progress(){
+#if 0
     return showProgressValue();
+#endif
+    return processvalue;
 }
 
 void RK_ota_get_sw_version(char *buffer, int maxLength){
@@ -113,4 +141,12 @@ void RK_ota_get_sw_version(char *buffer, int maxLength){
     if(ver.size() <= maxLength){
         memcpy(buffer, ver.c_str(), ver.size());
     }
+}
+
+bool RK_ota_check_version(const char *url){
+    DeviceInfoInternel info;
+    info.setHost(url);
+    info.setCurrentConfig();
+    info.setTargetConfig();
+    return info.compareVersion();
 }
